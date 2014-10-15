@@ -1,43 +1,56 @@
 # nginx autogenerator reverse proxy
 #
+# Based on:
+# https://github.com/nginxinc/docker-nginx/blob/64ce8e442caea8b78ff5ebc144a527fc3f6d6d8b/Dockerfile
+# https://github.com/jwilder/nginx-proxy/blob/941f3cc9d2b4bdb97f2c63681dd586cca55e3ee3/Dockerfile
+#
 # VERSION: see `TAG`
-FROM ubuntu:14.04
-MAINTAINER Jason Wilder jwilder@litl.com
+FROM debian:wheezy
+MAINTAINER Joao Paulo Dubas "joao.dubas@gmail.com"
 
-# install Nginx.
-RUN echo "deb http://ppa.launchpad.net/nginx/stable/ubuntu trusty main" \
-        > /etc/apt/sources.list.d/nginx-stable-trusty.list \
-    && echo "deb-src http://ppa.launchpad.net/nginx/stable/ubuntu trusty main" \
-        >> /etc/apt/sources.list.d/nginx-stable-trusty.list \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys C300EE8C \
-    && apt-get update \
-    && apt-get install --only-upgrade bash \
-    && apt-get install -y -qq --force-yes wget nginx \
-    && echo "daemon off;" >> /etc/nginx/nginx.conf
+# environment variables
+ENV NGINX_VERSION 1.7.6-1~wheezy
+ENV DOCKER_HOST unix:///tmp/docker.sock
 
-# fix for long server names
-RUN sed -i \
-        's/# server_names_hash_bucket/server_names_hash_bucket/g' \
-        /etc/nginx/nginx.conf \
-    && sed -r -i \
-        "s/(\s+)([^\*]+\*;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-static\/*;/g" \
-        /etc/nginx/nginx.conf
+# install system deps
+RUN apt-key adv \
+        --keyserver pgp.mit.edu \
+        --recv-keys 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62 \
+    && echo "deb http://nginx.org/packages/mainline/debian/ wheezy nginx" \
+        >> /etc/apt/sources.list \
+    && apt-get -y -qq --force-yes update \
+    && apt-get --only-upgrade install bash \
+    && apt-get -y -qq --force-yes install nginx=${NGINX_VERSION} wget
+
+# forward request and error logs to docker log collector
+RUN ln -sf /dev/stdout /var/log/nginx/access.log \
+    && ln -sf /dev/stderr /var/log/nginx/error.log
 
 # install external deps
-RUN wget \
+RUN wget --no-check-certificate \
         -P /usr/local/bin \
         https://godist.herokuapp.com/projects/ddollar/forego/releases/current/linux-amd64/forego \
     && chmod u+x /usr/local/bin/forego \
-    && wget https://github.com/jwilder/docker-gen/releases/download/0.3.3/docker-gen-linux-amd64-0.3.3.tar.gz \
+    && wget --no-check-certificate \
+        https://github.com/jwilder/docker-gen/releases/download/0.3.3/docker-gen-linux-amd64-0.3.3.tar.gz \
     && tar -C /usr/local/bin -xvzf docker-gen-linux-amd64-0.3.3.tar.gz
+
+# improve default conf for nginx
+RUN mkdir /etc/nginx/sites-enabled \
+    && echo "daemon off;" >> /etc/nginx/nginx.conf \
+    && sed -r -i \
+        "s/(\s+)(include [^\;]+;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-enabled\/*;/g" \
+        /etc/nginx/nginx.conf \
+    && sed -r -i \
+        "s/(\s+)(include [^\*]+\*;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-static\/*;/g" \
+        /etc/nginx/nginx.conf
 
 # configure forego
 RUN mkdir -p /opt/nginx-proxy
 ADD ./Procfile /opt/nginx-proxy/Procfile
 
 # container conf
-ENV DOCKER_HOST unix:///tmp/docker.sock
-EXPOSE 80
+EXPOSE 80 443
 VOLUME ["/opt/nginx-proxy/nginx", "/opt/nginx-proxy/sites-static"]
 WORKDIR /opt/nginx-proxy
 CMD ["forego", "start", "-r"]
