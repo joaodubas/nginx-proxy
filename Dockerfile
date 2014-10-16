@@ -45,6 +45,10 @@ RUN mkdir /etc/nginx/sites-enabled \
         "s/(\s+)(include [^\*]+\*;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-static\/*;/g" \
         /etc/nginx/nginx.conf
 
+# add default nginx conf template
+ADD ./nginx.tmpl /opt/nginx-proxy/default/nginx.tmpl
+RUN ln -s /opt/nginx-proxy/default /opt/nginx-proxy/nginx
+
 # configure forego
 RUN mkdir -p /opt/nginx-proxy
 ADD ./Procfile /opt/nginx-proxy/Procfile
