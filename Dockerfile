@@ -39,10 +39,7 @@ RUN wget --no-check-certificate \
 RUN mkdir /etc/nginx/sites-enabled \
     && echo "daemon off;" >> /etc/nginx/nginx.conf \
     && sed -r -i \
-        "s/(\s+)(include [^\;]+;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-enabled\/*;/g" \
-        /etc/nginx/nginx.conf \
-    && sed -r -i \
-        "s/(\s+)(include [^\*]+\*;)/\1\2\n\1include \/opt\/nginx-proxy\/sites-static\/*;/g" \
+        "s/(\s+)(include \/etc\/nginx\/conf[^\;]+;)/\1\2\n\1include \/etc\/nginx\/sites-enabled\/*;\n\1include \/opt\/nginx-proxy\/sites-static\/*;/g" \
         /etc/nginx/nginx.conf
 
 # add default nginx conf template
